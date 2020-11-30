@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        {inline-assets}
+        <style>
+            :root {
+                --body-bg-color: #010101;
+                --buffer-bg-color: #111;
+                --buffer-text-color: #eee;
+                --top-bar-bg-color: #151515;
+                --bottom-bar-bg-color: #333;
+            }
+            html, body {
+                height: 100%;
+            }
+            body {
+                margin:0px;
+                background-color:var(--body-bg-color);
+                font-family:'Consolas';
+                overflow:hidden;
+            }
+            #box {
+                display:flex;
+                flex-flow:column;
+                height:100%;
+                width:100%;
+            }
+            .editor {
+                box-sizing:border-box;
+                width:calc(100% - 10px);
+                flex:1 0 auto;
+                margin:5px;
+                margin-bottom:0px;
+                padding:10px;
+                
+                background-color:var(--buffer-bg-color);
+                border-radius:3px 3px 0px 0px;
+                color:var(--buffer-text-color);
+            }
+            .line {
+                white-space: pre-wrap;
+                margin:2px;
+            }
+            .md-h1 {
+                font-size:1.5em;
+            }
+            .md-h2 {
+                font-size:1.25em;
+            }
+            .cursor {
+                color:var(--buffer-bg-color);
+                background-color:var(--buffer-text-color);
+            }
+            .cursor-vbar {
+                color:var(--buffer-text-color);
+                background: linear-gradient(to right, var(--buffer-text-color) 0%, var(--buffer-text-color) 20%, transparent 20%);
+            }
+            #top-bar {
+                box-sizing:border-box;
+                width:calc(100% - 10px);
+                flex: 0 0 20px;
+                line-height:20px;
+                margin:5px;
+                margin-bottom:0px;
+                padding-left: 10px;
+                padding-right: 10px;
+                border-radius:3px;
+                    
+                background-color:var(--top-bar-bg-color);
+                font-size:12px;
+                vertical-align:middle;
+                color:var(--buffer-text-color);
+            }
+            #bottom-bar {
+                box-sizing:border-box;
+                width:100%;
+                flex: 0 0 20px;
+                line-height:20px;
+                padding-left: 10px;
+                padding-right: 10px;
+                
+                background-color:var(--bottom-bar-bg-color);
+                font-size:12px;
+                vertical-align:middle;
+                color:var(--buffer-text-color);
+            }
+        </style>
+        <script>
+            window.addEventListener('load', function() {
+                external.invoke(JSON.stringify({"type":"init"}));
+            });
+            document.addEventListener('keydown', keyDown);
+            
+            var modeArr = ["normal"];
+            var commandString = [""];
+            
+            var commands = {
+                "normal": {
+                    "h":{command:"moveLeft",params:[]},
+                    "j":{command:"moveDown",params:[]},
+                    "k":{command:"moveUp",params:[]},
+                    "l":{command:"moveRight",params:[]},
+                    "<Enter>":{command:"moveDown",params:[]},
+                    "<Backspace>":{command:"moveLeft",params:[]},
+                    
+                    "gg":{command:"moveBeginning",params:[]},
+                    "G":{command:"moveEnd",params:[]},
+                    "w":{command:"moveWord",params:[]},
+                    "f":{command:"moveFind",params:["key"]},
+                    "F":{command:"moveFindBackward",params:["key"]},
+                    "$":{command:"moveBack",params:[]},
+                    "0":{command:"moveFront",params:[]},
+                    
+                    "c":{command:"change",params:["motion"]},
+                    "cc":"0c$",
+                    "r":{command:"replaceChar",params:["key"]},
+                    "~":{command:["toggleCharCase","moveRight"],params:[]},
+                    "x":{command:"deleteChar",params:[]},
+                    "d":{command:"delete",params:["motion"]},
+                    "dd":{command:"deleteLine",params:[""]},
+                    
+                    "gt":{command:"nextTab",params:[]},
+                    "gT":{command:"prevTab",params:[]},
+                    "o":{command:["openDown","moveDown","modeInsert"],params:[]},
+                    "O":{command:["openUp","modeInsert"],params:[]},
+                    
+                    "J":{command:"joinLine",params:[]},
+                    
+                    "I":{command:["moveFront","modeInsert"],params:["local"]},
+                    "i":{command:"modeInsert",params:["local"]},
+                    "s":{command:["deleteChar","modeInsert"],params:["local"]},
+                    "a":{command:["modeInsert","moveRight"],params:["local"]},
+                    "A":{command:["moveBack","modeInsert","moveRight"],params:["local"]},
+                    "v":{command:"toggleSelection",params:[]},
+                    ":":{command:"modeConsole",params:["local"]},
+                    
+                    "<A-F4>":":q<Enter>",
+                    "<C-s>":":w<Enter>",
+                    "<C-o>":{command:"openFile",params:[]},
+                },
+                "motion": {
+                    "w":{command:"moveWord",params:[]},
+                    "f":{command:"moveFind",params:["key"]},
+                    "i":{command:"moveInside",params:["key"]},
+                    "a":{command:"moveAround",params:["key"]},
+                    "gg":{command:"moveBeginning",params:[]},
+                    "G":{command:"moveEnd",params:[]},
+                    "w":{command:"moveWord",params:[]},
+                    "f":{command:"moveFind",params:["key"]},
+                    "F":{command:"moveFindBackward",params:["key"]},
+                    "$":{command:"moveBack",params:[]},
+                    "0":{command:"moveFront",params:[]},
+                },
+                "key": {},
+                "insert": {
+                    "<*>":{command:["insertChar","moveRight"],params:["key"]},
+                    "<Backspace>":{command:"deleteBack",params:[]},
+                    "<ArrowLeft>":{command:"moveLeft",params:[]},
+                    "<ArrowDown>":{command:"moveDown",params:[]},
+                    "<ArrowUp>":{command:"moveUp",params:[]},
+                    "<ArrowRight>":{command:"moveRight",params:[]},
+                    "<Escape>":{command:["modeNormal","moveLeft"],params:[]},
+                    "<Enter>":{command:["splitLine","moveDown","moveFront"],params:[]},
+                },
+                "console": {
+                    "<*>":{command:"insertConsoleChar",params:["key"]},
+                    "<Enter>":{command:"runConsole",params:[]},
+                    "<Escape>":{command:"modeNormal",params:[]},
+                }
+            };
+            
+            var ignoredKeys = [
+               "Shift", "Alt", "Control" 
+            ];
+            
+            var replacedKeys = {
+                "Spacebar": " ",
+                "Backspace": "<Backspace>",
+                "ArrowLeft":"<ArrowLeft>",
+                "ArrowRight":"<ArrowRight>",
+                "ArrowUp":"<ArrowUp>",
+                "ArrowDown":"<ArrowDown>",
+                "Enter":"<Enter>",
+                "Escape":"<Escape>",
+            };
+            
+            function modeNormal(data) {
+                changeMode("normal");
+                document.getElementById("console-text").innerText = '';
+            }
+            function modeInsert(data) {
+                changeMode("insert");
+            }
+            function modeConsole(data) {
+                document.getElementById("console-text").innerText = ':';
+                changeMode("console");
+            }
+            function insertConsoleChar(data) {
+                document.getElementById("console-text").innerText +=
+                    data.key;
+            }
+            function runConsole(data) {
+                var consoleJson = {
+                    "type":"console",
+                    "command":document.getElementById("console-text").innerText,
+                };
+                
+                external.invoke(JSON.stringify(consoleJson));
+                
+                document.getElementById("console-text").innerText = '';
+
+                changeMode("normal");
+            }
+            
+            function numStrOverlaps(strArr, testStr) {
+                var out = 0;
+                for (var i = 0; i < strArr.length; i++) {
+                    if (strArr[i].length >= testStr.length) {
+                        if (strArr[i].substring(0, testStr.length) == testStr) {
+                            out++;
+                        }
+                    }
+                }
+                return out;
+            }
+            
+            function clearCommands() {
+                modeArr = [modeArr[0]];
+                commandString = [""];
+            }
+            
+            function externalDebug(msg) {
+                external.invoke(JSON.stringify(
+                    {
+                        "type":"debug",
+                        "message":msg,
+                    }
+                ));
+            }
+            
+            function executeCommand(command, key, motion) {
+                if (window[command] != undefined) {
+                    window[command](executeCommandJSON(command, key, motion));
+                } else {
+                    if (typeof command == "string") {
+                        external.invoke(JSON.stringify(executeCommandJSON(command, key, motion)));
+                    } else {
+                        for (var i = 0; i < command.length; i++) {
+                            executeCommand(command[i], key, motion);
+                        }
+                    }
+                }
+            }
+            
+            function executeCommandJSON(command, key, motion) {
+                return {
+                    "type":"edit",
+                    "command":command,
+                    "key":key,
+                    "motion":motion
+                };
+            }
+            
+            function changeMode(newMode) {
+                modeArr = [newMode];
+                populateBuffer(previousData);
+                document.getElementById("mode-text").innerText =
+                    "-- " + newMode.toUpperCase() + " --";
+            }
+            
+            var previousData;
+            function populateBuffer(data) {
+                previousData = JSON.parse(JSON.stringify(data));
+                
+                var lines = document.querySelector("#buffer .lines");
+                var cursorClass = (modeArr[0] == "insert" ? "cursor-vbar" : "cursor");
+                lines.innerHTML = "";
+                
+                //Add cursor html
+                for (var i = 0; i < data.cursors.length; i++) {
+                    var cursor = data.cursors[i];
+                    if (cursor.line < data.lines.length) {
+                        if (cursor.index < data.lines[cursor.line].length) {
+                            data.lines[cursor.line] =
+                                data.lines[cursor.line].substring(0, cursor.index) +
+                                "<span class='" + cursorClass + "'>" + data.lines[cursor.line][cursor.index] +
+                                "</span>" +
+                                data.lines[cursor.line].substring(cursor.index + 1);
+                        } else if (data.lines[cursor.line].length == 0) {
+                            data.lines[cursor.line] = "<span class='" + cursorClass + "'> </span>";
+                        } else {
+                            data.lines[cursor.line] =
+                                data.lines[cursor.line] +
+                                "<span class='" + cursorClass + "'> </span>";
+                        }
+                    }
+                }
+                //Draw lines
+                for (var i = 0; i < data.lines.length; i++) {
+                    var lineNode = document.createElement("p");
+                    lineNode.innerHTML = (data.lines[i] == "" ? "&nbsp;" : data.lines[i]);
+                    lineNode.classList.add("line");
+                    //MD
+                    if (lineNode.textContent.match(/^\# /g)) {
+                        lineNode.classList.add("md-h1");
+                    } else if (lineNode.textContent.match(/^\#\# /g)) {
+                        lineNode.classList.add("md-h2");
+                    }
+                    var cursorOnLine = false;
+                    for (var k = 0; k < data.cursors.length; k++) {
+                        if (data.cursors[k].line == i) {
+                            cursorOnLine = true;
+                        }
+                    }
+                    if (!cursorOnLine) {
+                        var colorRegex = /(#([a-f]|[A-F]|[0-9]){6}|#([a-f]|[A-F]|[0-9]){3})/g;
+                        lineNode.innerHTML = lineNode.innerHTML.replace(colorRegex, function(match) {
+                            return "<span style='background-color:" + match + ";border-radius:4px;'>" + match + "</span>";
+                        });
+                        
+                        //Latex
+                        var latexRegex = /\$(.+?)\$/g;
+                        lineNode.innerHTML = lineNode.innerHTML.replace(latexRegex, function(match, capture, offset) {
+                            return katex.renderToString(capture, {
+                                throwOnError: false
+                            });
+                        });
+                    }
+                    lines.appendChild(lineNode);
+                }
+            }
+            
+            function keyDown(e) {
+                keyString = e.key;
+                if (e.altKey) {
+                    keyString = "<A-" + keyString + ">";
+                } else if (e.ctrlKey) {
+                    keyString = "<C-" + keyString + ">";
+                }
+                var toPress = null;
+                
+                if (ignoredKeys.indexOf(keyString) != -1)
+                    return;
+                if (replacedKeys[keyString] != undefined) {
+                    keyString = replacedKeys[keyString];
+                }
+                
+                mode = modeArr[modeArr.length - 1];
+                modeCommands = Object.keys(commands[mode]);
+                
+                if (keyString == "<Escape>") {
+                    clearCommands();
+                }
+                
+                //Any-key pending mode
+                if (mode == "key") {
+                    if (commandString.length == 1) {
+                        executeCommand(
+                            commands[modeArr[modeArr.length - 2]][commandString[commandString.length - 1]].command,
+                            keyString);
+                    } else {
+                        executeCommand(commands[modeArr[0]][commandString[0]].command, undefined,
+                            executeCommandJSON(
+                                commands[modeArr[modeArr.length - 2]][commandString[commandString.length - 1]].command,
+                                keyString));
+                    }
+                    clearCommands();
+                    return;
+                }
+                
+                //Wildcard mode
+                if (modeCommands[0] == "<*>") {
+                    if (modeCommands.indexOf(keyString) != -1) {
+                        executeCommand(
+                            commands[mode][keyString].command,
+                            keyString);
+                    } else {
+                        executeCommand(
+                            commands[mode][modeCommands[0]].command,
+                            keyString);
+                    }
+                    return;
+                }
+                
+                //No possible commands with this key sequence
+                if (numStrOverlaps(modeCommands,
+                        commandString[commandString.length - 1] + keyString) == 0) {
+                    //Check and see if commandString - 1 char matches 1 modeCommands.filter by len.
+                    var modeCommandsFiltered = modeCommands.filter(function (x) {
+                        return x.length <= commandString[commandString.length - 1].length;
+                    });
+                    
+                    if (numStrOverlaps(modeCommandsFiltered,
+                        commandString[commandString.length - 1]) != 1) {
+                        //Still no possible command
+                        clearCommands();
+                        return;
+                    } else {
+                        modeCommands = modeCommandsFiltered;
+                        toPress = keyString;
+                    }
+                } else {
+                    //Append to the command string
+                    commandString[commandString.length - 1] += keyString;
+                }
+                
+                //We've reached the command
+                if (numStrOverlaps(modeCommands, commandString[commandString.length - 1]) == 1) {
+                    var commandObj = commands[mode][commandString[commandString.length - 1]];
+                    
+                    if (typeof commandObj == "string") {
+                        clearCommands();
+                        commandObj.match(/\<.+?\>|./g).forEach((e) => {
+                            keyDown({key:e});
+                        });
+                    } else if (commandObj.params.indexOf("key") != -1) {
+                        modeArr.push("key");
+                    } else if (commandObj.params.indexOf("motion") != -1) {
+                        modeArr.push("motion");
+                        commandString.push("");
+                    } else {
+                        //No pending mode, command sequence over
+                        if (commandString.length == 1) {
+                            executeCommand(commands[modeArr[0]][commandString[0]].command);
+                        } else {
+                            executeCommand(commands[modeArr[0]][commandString[0]].command, undefined,
+                                executeCommandJSON(commands[mode][commandString[commandString.length - 1]].command));
+                        }
+                        clearCommands();
+                    }
+                }
+                
+                if (toPress != null) {
+                    keyDown({key:toPress});
+                }
+            }
+        </script>
+    </head>
+    <body>
+        <div id="box">
+            <div id="top-bar">
+                <span class="tab">Untitled.txt</span>
+            </div>
+            <div id="buffer" class="editor">
+                <div class="lines">
+                </div>
+            </div>
+            <div id="bottom-bar">
+                <span id="console-text"></span>
+                <span id="mode-text" style="float:right;">-- NORMAL --</span>
+            </div>
+        </div>
+    </body>
+</html>
