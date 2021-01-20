@@ -48,7 +48,6 @@ pub fn execute_command(buffer: &mut Buffer, command_string: &str) -> String {
 
 fn quit(_buffer: &mut Buffer, _args: Vec<&str>) -> Option<String> {
     process::exit(0);
-    None
 }
 
 fn edit(buffer: &mut Buffer, args: Vec<&str>) -> Option<String> {
@@ -57,12 +56,12 @@ fn edit(buffer: &mut Buffer, args: Vec<&str>) -> Option<String> {
     None
 }
 
-fn write(buffer: &mut Buffer, args: Vec<&str>) -> Option<String> {
+fn write(buffer: &mut Buffer, _args: Vec<&str>) -> Option<String> {
     buffer.write();
     None
 }
 
-fn clear_cursors(buffer: &mut Buffer, args: Vec<&str>) -> Option<String> {
+fn clear_cursors(buffer: &mut Buffer, _args: Vec<&str>) -> Option<String> {
     buffer.cursors.truncate(1);
     None
 }

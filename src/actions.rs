@@ -15,6 +15,9 @@ lazy_static! {
         m.insert("moveLeft", move_left);
         m.insert("moveRight", move_right);
         
+        m.insert("viewportUp", viewport_up);
+        m.insert("viewportDown", viewport_down);
+        
         m.insert("moveFront", move_front);
         m.insert("moveBack", move_back);
         m.insert("moveWord", move_word);
@@ -67,8 +70,6 @@ pub fn execute_action(buffer: &mut Buffer, command: &str, motion: &Value, key: O
             lines_diff = (buffer.lines.len() as isize) - lines_diff;
             columns_diff = (buffer.lines[buffer.cursors[c].line].len() as isize) - columns_diff;
             
-            println!("{}", columns_diff);
-            
             //Shift previous cursors
             for d in 0..c {
                 buffer.cursors[d].line =
@@ -95,10 +96,16 @@ fn move_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.cursors[c].line > 0 {
         buffer.cursors[c].line -= 1;
     }
+    if buffer.cursors[c].line < buffer.viewport {
+        buffer.viewport = buffer.cursors[c].line;
+    }
 }
 fn move_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.cursors[c].line < buffer.lines.len() - 1 {
         buffer.cursors[c].line += 1;
+    }
+    if buffer.cursors[c].line - buffer.viewport > buffer.height {
+        buffer.viewport = buffer.cursors[c].line;
     }
 }
 fn move_left(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
@@ -127,7 +134,7 @@ fn move_word(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
         static ref WORDRE: Regex = Regex::new("([A-z]|[0-9]|_)+").unwrap();
     }
     for cap in WORDRE.captures_iter(&buffer.lines[buffer.cursors[c].line]) {
-        if (cap.get(1).unwrap().start() > buffer.cursors[c].index) {
+        if cap.get(1).unwrap().start() > buffer.cursors[c].index {
             buffer.cursors[c].index = cap.get(1).unwrap().start();
             break;
         }
@@ -159,6 +166,30 @@ fn move_find_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
             return;
         }
         i += 1;
+    }
+}
+
+//Viewport mutation
+fn viewport_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+    if c != 0 { return; }
+    
+    match buffer.viewport.checked_sub(1) {
+        Some(n) => buffer.viewport = n,
+        None => (),
+    }
+}
+fn viewport_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+    if c != 0 { return; }
+    
+    buffer.viewport += 1;
+    
+    //Constrain to file length
+    if buffer.viewport >= buffer.lines.len() {
+        buffer.viewport = buffer.lines.len() - 1;
+    }
+    
+    if buffer.cursors.len() == 1 && buffer.cursors[0].line < buffer.viewport {
+        buffer.cursors[0].line = buffer.viewport;
     }
 }
 
@@ -317,6 +348,6 @@ fn open_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.dirty = true;
 }
 
-fn open_file(_buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+fn open_file(_buffer: &mut Buffer, _c: usize, _key: Option<&str>) {
     println!("File path chosen: {}", tinyfiledialogs::open_file_dialog("Open", "./", None).unwrap());
 }

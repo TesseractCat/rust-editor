@@ -2,10 +2,12 @@ use crate::cursor::*;
 use std::cmp;
 use std::fs::File;
 use std::io::{self, BufRead, Write};
-use std::path::Path;
 
 pub struct Buffer {
     pub path: Option<String>,
+    
+    pub viewport: usize,
+    pub height: usize,
     
     pub lines: Vec<String>,
     pub file_as_string: String,
@@ -18,6 +20,8 @@ impl Buffer {
     pub fn new() -> Buffer {
         Buffer {
             path: None,
+            viewport:0,
+            height:50,
             lines: vec!["Scratch buffer".to_string(), "".to_string(), "Text".to_string()],
             file_as_string: vec!["Scratch buffer".to_string(), "".to_string(), "Text".to_string()].join("\n"),
             dirty: false,
@@ -33,9 +37,9 @@ impl Buffer {
     
     pub fn load_path(&mut self, path: &str) {
         let file = File::open(path);
-        let mut file = match file {
+        let file = match file {
             Ok(f) => f,
-            Err(e) => {
+            Err(_e) => {
                 tinyfiledialogs::message_box_ok("Error", "Error opening file", tinyfiledialogs::MessageBoxIcon::Error);
                 return;
             },
@@ -54,19 +58,19 @@ impl Buffer {
             return;
         }
         
-        let mut file = File::create(self.path.as_ref().unwrap());
+        let file = File::create(self.path.as_ref().unwrap());
         let mut file = match file {
             Ok(f) => f,
-            Err(e) => {
+            Err(_e) => {
                 tinyfiledialogs::message_box_ok("Error", "Error writing file", tinyfiledialogs::MessageBoxIcon::Error);
                 return;
             },
         };
-        file.write_all(self.lines.join("\n").as_bytes());
+        file.write_all(self.lines.join("\n").as_bytes()).ok();
     }
     
     pub fn add_before_cursor(&mut self, cursor: &Box<Cursor>, new_content: &str) {
-        let mut lower = cursor.get_lower();
+        let lower = cursor.get_lower();
         
         if lower.1 >= self.lines[lower.0].len() {
             self.lines[lower.0].push_str(new_content);
