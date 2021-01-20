@@ -1,6 +1,6 @@
 //#![windows_subsystem = "windows"]
 use web_view::*;
-use std::{fs, str};
+use std::{cmp, str};
 use serde_json::{Value, json};
 use regex::{Captures, Regex};
 use rust_embed::RustEmbed;
@@ -30,9 +30,13 @@ fn main() {
     let mut html_content: String = include_str!("assets/index.html").to_string();
     html_content = html_content.replace("{inline-assets}",
         &vec![
+        inline_style(include_str!("assets/index.css")),
+        inline_script(include_str!("assets/index.js")),
+        
         inline_style(include_str!("assets/katex/katex.css")),
-        inline_script(include_str!("assets/katex/katex.min.js"))
+        inline_script(include_str!("assets/katex/katex.min.js")),
         ].join(""));
+    
     //Load base64 fonts
     //TODO: Do this as a preprocess step
     let font_re = Regex::new("fonts/(.+?\\.woff2)\\)").unwrap();
@@ -82,7 +86,7 @@ fn handler(webview: &mut WebView<Buffer>, arg: &str) {
         redraw(webview);
     } else if response["type"] == "console" {
         let console_response = console::execute_command(state, response["command"].as_str().unwrap_or_default());
-        webview.eval(&console_response);
+        webview.eval(&console_response).ok();
         redraw(webview);
     }
 }
@@ -95,7 +99,9 @@ fn redraw(webview: &mut WebView<Buffer>) {
     });
     let buffer_data = json!({
         "path": state.path.as_ref().unwrap_or(&"".to_string()),
-        "lines": state.lines,
+        "viewport":state.viewport,
+        "lines": state.lines.get(
+            state.viewport..cmp::min(state.lines.len(), state.viewport + state.height)),
         "cursors": state.cursors
     });
     webview.eval(&format!("populateBuffer({})", buffer_data.to_string())).ok();
