@@ -308,7 +308,14 @@ function applyHighlights(line, highlights) {
     
     //Sort highest index to lowest index
     tags.sort(function(a, b) {
-        return b.index - a.index;
+        var n = b.index - a.index;
+        if (n !== 0)
+            return n;
+        
+        if (a.tag != "</span>" && b.tag == "</span>") {
+            return -1;
+        }
+        return 1;
     });
     //Apply tags to line
     for (var i = 0; i < tags.length; i++) {
