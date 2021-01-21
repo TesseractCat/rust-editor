@@ -281,6 +281,17 @@ function changeMode(newMode) {
         "-- " + newMode.toUpperCase() + " --";
 }
 
+function encodeEntities(str) {
+    return str.replace(/[\u00A0-\u9999<>\&]/g, function(i) {
+        return '&#'+i.charCodeAt(0)+';';
+    });
+}
+function decodeEntities(str) {
+    return str.replace(/&#\d+?;/g, function(i) {
+        return String.fromCharCode(i.match(/\d+/g)[0]);
+    });
+}
+
 function applyHighlights(line, highlights) {
     if (highlights.length == 0)
         return line;
@@ -327,6 +338,7 @@ function applyHighlights(line, highlights) {
 }
 
 var currentBuffer;
+//FIXME: Don't repopulate entire buffer every keypress
 function populateBuffer(buffer) {
     //FIXME: Find better way to clone buffer
     currentBuffer = JSON.parse(JSON.stringify(buffer));
@@ -414,48 +426,41 @@ function populateBuffer(buffer) {
         } else if (lineNode.textContent.match(/^\#\# /g)) {
             lineNode.classList.add("md-h2");
         }
-        var cursorOnLine = false;
-        for (var k = 0; k < buffer.cursors.length; k++) {
-            if (buffer.cursors[k].line == i) {
-                cursorOnLine = true;
-            }
-        }
-        if (!cursorOnLine || true) {
-            //Color
-            var colorRegex = /(#([a-f]|[A-F]|[0-9]){6}|#([a-f]|[A-F]|[0-9]){3})/g;
-            lineNode.innerHTML = lineNode.innerHTML.replace(colorRegex, function(match) {
-                if (match.includes("span"))
-                    return match;
-                return "<span style='background-color:" + match + ";border-radius:4px;'>" + match + "</span>";
+
+        //Color
+        var colorRegex = /(#([a-f]|[A-F]|[0-9]){6}|#([a-f]|[A-F]|[0-9]){3})/g;
+        lineNode.innerHTML = lineNode.innerHTML.replace(colorRegex, function(match) {
+            if (match.includes("span"))
+                return match;
+            return "<span style='background-color:" + match + ";border-radius:4px;'>" + match + "</span>";
+        });
+        
+        //Italics
+        var italicRegex = /\*.+?\*/g;
+        lineNode.innerHTML = lineNode.innerHTML.replace(italicRegex, function(match) {
+            if (match.includes("span"))
+                return match;
+            return "<i>" + match + "</i>";
+        });
+        
+        //Links
+        var italicRegex = /\[\[(.+?)\]\]/g;
+        lineNode.innerHTML = lineNode.innerHTML.replace(italicRegex, function(match, capture, offset) {
+            if (match.includes("span"))
+                return match;
+            return "<span class='link'>" + match + "</span>";
+        });
+        
+        //Latex
+        var latexRegex = /\$(.+?)\$/g;
+        lineNode.innerHTML = lineNode.innerHTML.replace(latexRegex, function(match, capture, offset) {
+            if (match.includes("span"))
+                return match;
+            //FIXME: Different output if only has spaces or error
+            return katex.renderToString(capture, {
+                throwOnError: false
             });
-            
-            //Italics
-            var italicRegex = /\*.+?\*/g;
-            lineNode.innerHTML = lineNode.innerHTML.replace(italicRegex, function(match) {
-                if (match.includes("span"))
-                    return match;
-                return "<i>" + match + "</i>";
-            });
-            
-            //Links
-            var italicRegex = /\[\[(.+?)\]\]/g;
-            lineNode.innerHTML = lineNode.innerHTML.replace(italicRegex, function(match, capture, offset) {
-                if (match.includes("span"))
-                    return match;
-                return "<span class='link'>" + match + "</span>";
-            });
-            
-            //Latex
-            var latexRegex = /\$(.+?)\$/g;
-            lineNode.innerHTML = lineNode.innerHTML.replace(latexRegex, function(match, capture, offset) {
-                if (match.includes("span"))
-                    return match;
-                //FIXME: Different output if only has spaces or error
-                return katex.renderToString(capture, {
-                    throwOnError: false
-                });
-            });
-        }
+        });
     });
 }
 
