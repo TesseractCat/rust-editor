@@ -11,6 +11,14 @@
 html, body {
     height: 100%;
 }
+* {
+    user-select: none;
+    -ms-user-select: none;
+    -webkit-user-select: none;
+}
+p {
+    cursor: default;
+}
 body {
     margin:0px;
     background-color:var(--body-bg-color);
@@ -19,16 +27,34 @@ body {
 }
 #box {
     display:flex;
-    flex-flow:column;
+    flex-flow:column nowrap;
     height:100%;
     width:100%;
 }
-.editor {
-    box-sizing:border-box;
-    width:calc(100% - 10px);
-    flex:1 0 auto;
+#content {
+    display:flex;
+    flex: 1 1 auto;
+    flex-flow:row nowrap;
     margin:5px;
     margin-bottom:0px;
+}
+#sidebar {
+    background-color:#3D995E;
+    flex: 0 0 auto;
+    width:20px;
+    transition:width 0.2s;
+    margin-right:5px;
+    border-radius:3px 3px 0px 0px;
+}
+#sidebar:hover {
+    cursor:pointer;
+    width:45px;
+}
+.editor {
+    box-sizing:border-box;
+    width: 50px;
+    flex:1 1 auto;
+    
     padding:10px;
     overflow:hidden;
     
