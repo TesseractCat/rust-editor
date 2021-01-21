@@ -53,7 +53,7 @@ fn main() {
     let mut webview = web_view::builder()
         .title("Frog")
         .content(Content::Html(html_content))
-        .size(500, 500)
+        .size(800, 500)
         .resizable(true)
         .visible(false)
         .user_data(main_buffer)
