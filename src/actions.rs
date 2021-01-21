@@ -21,6 +21,8 @@ lazy_static! {
         m.insert("moveFront", move_front);
         m.insert("moveBack", move_back);
         m.insert("moveWord", move_word);
+        m.insert("moveWordReverse", move_word_reverse);
+        
         m.insert("moveFind", move_find);
         m.insert("moveFindReverse", move_find_reverse);
         
@@ -136,6 +138,19 @@ fn move_word(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     for cap in WORDRE.captures_iter(&buffer.lines[buffer.cursors[c].line]) {
         if cap.get(1).unwrap().start() > buffer.cursors[c].index {
             buffer.cursors[c].index = cap.get(1).unwrap().start();
+            break;
+        }
+    }
+}
+fn move_word_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+    lazy_static! {
+        //static ref WORDRE: Regex = Regex::new("(([A-z]|[0-9]|_)+|[^a-zA-Z0-9\\s]+)").unwrap();
+        static ref WORDRE: Regex = Regex::new("([A-z]|[0-9]|_)+").unwrap();
+    }
+    for cap in WORDRE.captures_iter(&buffer.lines[buffer.cursors[c].line]) {
+        let temp_index: usize = buffer.cursors[c].index;
+        if cap.get(0).unwrap().start() < temp_index {
+            buffer.cursors[c].index = cap.get(0).unwrap().start();
             break;
         }
     }

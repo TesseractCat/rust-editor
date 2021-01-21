@@ -21,7 +21,10 @@ var actions = {
         
         "gg":{action:"moveBeginning"},
         "G":{action:"moveEnd"},
+        
         "w":{action:"moveWord"},
+        "b":{action:"moveWordReverse"},
+        
         "$":{action:"moveBack"},
         "0":{action:"moveFront"},
         
@@ -278,37 +281,47 @@ function changeMode(newMode) {
         "-- " + newMode.toUpperCase() + " --";
 }
 
-function highlightRange(str, highlightClass, start, end, startClass, endClass) {
-    if (str == "&nbsp;")
-        str = "";
-    if (start >= str.length || str.length == 0) {
-        str = str + "<span class='" + highlightClass + " " + startClass + " " + endClass + "'> </span>";
-    } else if (start == end) {
-        str = str.substring(0, start) +
-            "<span class='" + endClass + "'>" +
-            str.substring(start, end + 1) +
-            "</span>" + str.substring(end + 1);
-    } else {
-        if (end >= str.length) {
-            str = str.substring(0, start) +
-                "<span class='" + highlightClass + "'>" +
-                "<span class='" + startClass + "'>" + str.substring(start, start + 1) + "</span>" +
-                str.substring(start + 1, end + 1) +
-                "<span class='" + endClass + "'> </span></span>";
+function applyHighlights(line, highlights) {
+    if (highlights.length == 0)
+        return line;
+    if (line == "&nbsp;")
+        line = "";
+    
+    var tags = [];
+    var outOfBounds = false;
+    //Populate tags
+    for (var i = 0; i < highlights.length; i++) {
+        if (highlights[i].start < line.length) {
+            tags.push({tag:"<span class='" + highlights[i].class + "'>", index: highlights[i].start});
+            tags.push({tag:"</span>", index: highlights[i].end + 1});
+        } else if (line.length == 0) {
+            tags.push({tag:"<span class='" + highlights[i].class + "'>", index: 0});
+            tags.push({tag:"</span>", index: 1});
         } else {
-            str = str.substring(0, start) +
-                "<span class='" + highlightClass + "'>" +
-                "<span class='" + startClass + "'>" + str.substring(start, start + 1) + "</span>" + 
-                str.substring(start + 1, end) +
-                "<span class='" + endClass + "'>" + str.substring(end, end + 1) + "</span>" +
-                "</span>" + str.substring(end + 1);
+            outOfBounds = true;
+            tags.push({tag:"<span class='" + highlights[i].class + "'>", index: line.length});
+            tags.push({tag:"</span>", index: line.length + 1});
         }
     }
-    return str;
+    if (line == "" || outOfBounds)
+        line = line + " ";
+    
+    //Sort highest index to lowest index
+    tags.sort(function(a, b) {
+        return b.index - a.index;
+    });
+    //Apply tags to line
+    for (var i = 0; i < tags.length; i++) {
+        line = line.substring(0, tags[i].index) +
+            tags[i].tag +
+            line.substring(tags[i].index);
+    }
+    return line;
 }
 
 var currentBuffer;
 function populateBuffer(buffer) {
+    //FIXME: Find better way to clone buffer
     currentBuffer = JSON.parse(JSON.stringify(buffer));
     
     //Update file name
@@ -320,6 +333,7 @@ function populateBuffer(buffer) {
     lines.innerHTML = "";
     
     var lineNodes = [];
+    var highlightRanges = [];
     
     //Draw lines
     for (var i = 0; i < buffer.lines.length; i++) {
@@ -327,7 +341,10 @@ function populateBuffer(buffer) {
         lineNode.innerHTML = (buffer.lines[i] == "" ? "&nbsp;" : buffer.lines[i]);
         lineNode.classList.add("line");
         lines.appendChild(lineNode);
+        
         lineNodes.push(lineNode);
+        highlightRanges.push([]);
+        
         var lineBreakNode = document.createElement("br");
         lines.appendChild(lineBreakNode);
     }
@@ -337,16 +354,13 @@ function populateBuffer(buffer) {
         //Shift cursors to align with viewport
         cursor.line = cursor.line - buffer.viewport
         cursor.line_range = cursor.line_range - buffer.viewport
-        //If not in selection mode, simply add the cursors
-        if (!cursor.range) {
-            if (cursor.line < lineNodes.length && cursor.line >= 0) {
-                lineNodes[cursor.line].innerHTML =
-                    highlightRange(lineNodes[cursor.line].innerHTML,
-                        "selected-line", cursor.index, cursor.index, "cursor",
-                        (modeArr[0] == "insert" ? "cursor-vbar" : "cursor"));
-            }
-            return;
+        
+        if (cursor.line < lineNodes.length && cursor.line >= 0) {
+            highlightRanges[cursor.line].push(
+                {class: (modeArr[0] == "insert" ? "cursor-vbar" : "cursor"), start: cursor.index, end: cursor.index});
         }
+        if (!cursor.range)
+            return;
         
         var cursorPointers = [{line:cursor.line,index:cursor.index},
             {line:cursor.line_range,index:cursor.index_range}];
@@ -363,32 +377,17 @@ function populateBuffer(buffer) {
             }
         });
         
-        
         if (cursorPointers[0].line == cursorPointers[1].line) {
-            var startClass = cursor.index > cursor.index_range ? "selected-line" : "cursor";
-            var endClass = cursor.index < cursor.index_range ? "selected-line" : "cursor";
-            
-            lineNodes[cursorPointers[0].line].innerHTML =
-                highlightRange(lineNodes[cursorPointers[0].line].innerHTML,
-                    "selected-line", cursorPointers[1].index, cursorPointers[0].index, startClass, endClass);
+            highlightRanges[cursor.line].push(
+                {class:"selected-line", start: cursorPointers[1].index, end: cursorPointers[0].index});
         } else {
             if (cursorPointers[0].line < buffer.lines.length) {
-                var startClass = "selected-line";
-                var endClass = cursorPointers[0].line == cursor.line ? "cursor" : "selected-line";
-                
-                lineNodes[cursorPointers[0].line].innerHTML =
-                    highlightRange(lineNodes[cursorPointers[0].line].innerHTML,
-                        "selected-line", 0, cursorPointers[0].index, startClass, endClass);
+                highlightRanges[cursorPointers[0].line].push(
+                    {class:"selected-line", start: 0, end: cursorPointers[0].index});
             }
             if (cursorPointers[1].line < buffer.lines.length) {
-                var startClass = cursorPointers[1].line == cursor.line ? "cursor" : "selected-line";
-                var endClass = "selected-line";
-                
-                lineNodes[cursorPointers[1].line].innerHTML =
-                    highlightRange(lineNodes[cursorPointers[1].line].innerHTML,
-                        "selected-line", cursorPointers[1].index,
-                        lineNodes[cursorPointers[1].line].innerHTML.length - 1,
-                    startClass, endClass);
+                highlightRanges[cursorPointers[1].line].push(
+                    {class:"selected-line", start: cursorPointers[1].index, end: lineNodes[cursorPointers[1].line].innerHTML.length - 1});
             }
         }
         
@@ -399,6 +398,9 @@ function populateBuffer(buffer) {
     
     //Do WYSIWYG text transformations
     lineNodes.forEach((lineNode, i) => {
+        //Apply highlights
+        lineNode.innerHTML = applyHighlights(lineNode.innerHTML, highlightRanges[i]);
+        
         //MD
         if (lineNode.textContent.match(/^\# /g)) {
             lineNode.classList.add("md-h1");
