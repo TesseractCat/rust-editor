@@ -5,6 +5,7 @@ use std::io::{self, BufRead, Write};
 
 pub struct Buffer {
     pub path: Option<String>,
+    pub changed: bool, //TODO: Handle this value
     
     pub viewport: usize,
     pub height: usize,
@@ -20,6 +21,7 @@ impl Buffer {
     pub fn new() -> Buffer {
         Buffer {
             path: None,
+            changed: false,
             viewport:0,
             height:50,
             lines: vec!["Scratch buffer".to_string(), "".to_string(), "Text".to_string()],
@@ -50,12 +52,26 @@ impl Buffer {
             .collect();
         self.path = Some(path.to_string());
         self.dirty = true;
+        self.cursors = vec![Box::new(Cursor {
+                line:0,
+                index:0,
+                line_range:0,
+                index_range:0,
+                range:false,
+            })];
     }
     
     pub fn write(&mut self) {
         if self.path == None {
-            tinyfiledialogs::message_box_ok("Error", "Can't write scratch buffer", tinyfiledialogs::MessageBoxIcon::Error);
-            return;
+            //tinyfiledialogs::message_box_ok("Error", "Can't write scratch buffer", tinyfiledialogs::MessageBoxIcon::Error);
+            match tinyfiledialogs::save_file_dialog("Save where...", "./") {
+                Some(p) => {
+                    self.path = Some(p);
+                },
+                None => {
+                    return;
+                },
+            }
         }
         
         let file = File::create(self.path.as_ref().unwrap());
