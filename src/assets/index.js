@@ -1,6 +1,11 @@
 //TODO: Split this into multiple file using "browserify" or "webpack"
 window.addEventListener('load', function() {
     external.invoke(JSON.stringify({"type":"init"}));
+    document.focus();
+});
+window.addEventListener('focus', function () {
+    externalDebug("testing");
+    document.focus();
 });
 document.addEventListener('keydown', keyDown);
 
@@ -76,6 +81,7 @@ var actions = {
         "gg":{action:"moveBeginning"},
         "G":{action:"moveEnd"},
         "w":{action:"moveWord"},
+        "b":{action:"moveWordReverse"},
         "$":{action:"moveBack"},
         "0":{action:"moveFront"},
         
@@ -108,6 +114,7 @@ var actions = {
         "l":{action:"moveRight"},
         
         "w":{action:"moveWord"},
+        "b":{action:"moveWordReverse"},
         "f":{action:"moveFind",params:["key"]},
         "i":{action:"moveInside",params:["key"]},
         "a":{action:"moveAround",params:["key"]},
@@ -292,6 +299,18 @@ function decodeEntities(str) {
     });
 }
 
+function entitySubstring(str, start, end) {
+    var htmlEntity = /&#\d+;/g;
+    
+    var match;
+    while ((match = htmlEntity.exec(str)) !== null) {
+        if (match.index < start)
+            start -= match[0].length - 1;
+        if (match.index < end)
+            end -= match[0].length - 1;
+    }
+}
+
 function applyHighlights(line, highlights) {
     if (highlights.length == 0)
         return line;
@@ -349,7 +368,8 @@ function populateBuffer(buffer) {
         (buffer.path == "" ? "<Untitled>" : buffer.path);
     
     var lines = document.querySelector("#buffer .lines");
-    lines.innerHTML = "";
+    while (lines.firstChild)
+        lines.removeChild(lines.firstChild);
     
     var lineNodes = [];
     var highlightRanges = [];
@@ -359,20 +379,21 @@ function populateBuffer(buffer) {
         var lineNode = document.createElement("p");
         lineNode.innerHTML = (buffer.lines[i] == "" ? "&nbsp;" : buffer.lines[i]);
         lineNode.classList.add("line");
-        lines.appendChild(lineNode);
         
         lineNodes.push(lineNode);
         highlightRanges.push([]);
-        
-        var lineBreakNode = document.createElement("br");
-        lines.appendChild(lineBreakNode);
     }
+    
+    var linesWithCursor = [];
     
     //Add cursor html
     buffer.cursors.forEach(cursor => {
         //Shift cursors to align with viewport
         cursor.line = cursor.line - buffer.viewport
         cursor.line_range = cursor.line_range - buffer.viewport
+        
+        linesWithCursor.push(cursor.line);
+        linesWithCursor.push(cursor.line_range);
         
         if (cursor.line < lineNodes.length && cursor.line >= 0) {
             highlightRanges[cursor.line].push(
@@ -417,6 +438,7 @@ function populateBuffer(buffer) {
     
     //Do WYSIWYG text transformations
     lineNodes.forEach((lineNode, i) => {
+        var appendLineNode = true;
         //Apply highlights
         lineNode.innerHTML = applyHighlights(lineNode.innerHTML, highlightRanges[i]);
         
@@ -430,23 +452,26 @@ function populateBuffer(buffer) {
         //Color
         var colorRegex = /(#([a-f]|[A-F]|[0-9]){6}|#([a-f]|[A-F]|[0-9]){3})/g;
         lineNode.innerHTML = lineNode.innerHTML.replace(colorRegex, function(match) {
-            if (match.includes("span"))
+            if (match.includes("<span") || match.includes("span>"))
                 return match;
             return "<span style='background-color:" + match + ";border-radius:4px;'>" + match + "</span>";
         });
         
-        //Italics
-        var italicRegex = /\*.+?\*/g;
-        lineNode.innerHTML = lineNode.innerHTML.replace(italicRegex, function(match) {
-            if (match.includes("span"))
+        //Emphasis
+        var emphasisRegex = /(\*+)(.*?)\1/g;
+        lineNode.innerHTML = lineNode.innerHTML.replace(emphasisRegex, function(match) {
+            if (match.includes("<span") || match.includes("span>"))
                 return match;
+            if (match.startsWith("**")) {
+                return "<b>" + match + "</b>";
+            }
             return "<i>" + match + "</i>";
         });
         
         //Links
-        var italicRegex = /\[\[(.+?)\]\]/g;
-        lineNode.innerHTML = lineNode.innerHTML.replace(italicRegex, function(match, capture, offset) {
-            if (match.includes("span"))
+        var linkRegex = /\[\[(.+?)\]\]/g;
+        lineNode.innerHTML = lineNode.innerHTML.replace(linkRegex, function(match, capture, offset) {
+            if (match.includes("<span") || match.includes("span>"))
                 return match;
             return "<span class='link'>" + match + "</span>";
         });
@@ -454,13 +479,41 @@ function populateBuffer(buffer) {
         //Latex
         var latexRegex = /\$(.+?)\$/g;
         lineNode.innerHTML = lineNode.innerHTML.replace(latexRegex, function(match, capture, offset) {
-            if (match.includes("span"))
+            if (match.includes("<span") || match.includes("span>"))
                 return match;
             //FIXME: Different output if only has spaces or error
             return katex.renderToString(capture, {
                 throwOnError: false
             });
         });
+        
+        ////Tables
+        //var tableRegex = /^(\|.+)+/g;
+        //if (tableRegex.test(lineNode.innerHTML) && linesWithCursor.indexOf(i) == -1) {
+        //    tableRowNode = document.createElement("tr");
+        //    tableRowNode.innerHTML = lineNode.innerHTML;
+        //    tableRowNode.innerHTML = tableRowNode.innerHTML.replace(tableRegex, function(match, capture, offset) {
+        //        var items = match.split("|").filter(x => x != "");
+        //        return "<td>" + items.join("</td><td>") + "</td>";
+        //    });
+        //    
+        //    if (lineNodes[i - 1] != null && lineNodes[i - 1].tagName == "TABLE") {
+        //        lineNodes[i - 1].appendChild(tableRowNode);
+        //        lineNodes[i] = lineNodes[i - 1];
+        //        appendLineNode = false;
+        //    } else {
+        //        tableNode = document.createElement("TABLE");
+        //        tableNode.appendChild(tableRowNode);
+        //        lineNodes[i] = tableNode;
+        //        lineNode = tableNode;
+        //    }
+        //}
+        
+        if (appendLineNode) {
+            lines.appendChild(lineNode);
+            var lineBreakNode = document.createElement("br");
+            lines.appendChild(lineBreakNode);
+        }
     });
 }
 
@@ -519,8 +572,7 @@ function keyDown(e) {
     }
     
     //No possible actions with this key sequence
-    if (numStrOverlaps(modeActions,
-            actionString[actionString.length - 1] + keyString) == 0) {
+    if (numStrOverlaps(modeActions, actionString[actionString.length - 1] + keyString) == 0) {
         //Check and see if actionString - 1 char matches 1 modeActions.filter by len.
         var modeActionsFiltered = modeActions.filter(function (x) {
             return x.length <= actionString[actionString.length - 1].length;

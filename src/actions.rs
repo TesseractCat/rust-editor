@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::buffer::*;
 use crate::cursor::*;
 use serde_json::Value;
-use regex::Regex;
+use regex::*;
 
 type EditAction = fn(&mut Buffer, usize, Option<&str>) -> ();
 
@@ -18,6 +18,9 @@ lazy_static! {
         m.insert("viewportUp", viewport_up);
         m.insert("viewportDown", viewport_down);
         
+        m.insert("moveBeginning", move_beginning);
+        m.insert("moveEnd", move_end);
+        
         m.insert("moveFront", move_front);
         m.insert("moveBack", move_back);
         m.insert("moveWord", move_word);
@@ -25,6 +28,8 @@ lazy_static! {
         
         m.insert("moveFind", move_find);
         m.insert("moveFindReverse", move_find_reverse);
+        m.insert("moveTill", move_till);
+        m.insert("moveTillReverse", move_till_reverse);
         
         m.insert("newCursorUp", new_cursor_up);
         m.insert("newCursorDown", new_cursor_down);
@@ -138,22 +143,29 @@ fn move_word(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     for cap in WORDRE.captures_iter(&buffer.lines[buffer.cursors[c].line]) {
         if cap.get(1).unwrap().start() > buffer.cursors[c].index {
             buffer.cursors[c].index = cap.get(1).unwrap().start();
-            break;
+            return;
         }
     }
+    //Finally, move to the back
+    move_back(buffer, c, _key);
 }
 fn move_word_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     lazy_static! {
         //static ref WORDRE: Regex = Regex::new("(([A-z]|[0-9]|_)+|[^a-zA-Z0-9\\s]+)").unwrap();
         static ref WORDRE: Regex = Regex::new("([A-z]|[0-9]|_)+").unwrap();
     }
-    for cap in WORDRE.captures_iter(&buffer.lines[buffer.cursors[c].line]) {
-        let temp_index: usize = buffer.cursors[c].index;
-        if cap.get(0).unwrap().start() < temp_index {
-            buffer.cursors[c].index = cap.get(0).unwrap().start();
-            break;
+    let mut matches: Vec<Match> =
+        WORDRE.captures_iter(&buffer.lines[buffer.cursors[c].line]).map(|x| x.get(0).unwrap()).collect::<Vec<Match>>();
+    matches.reverse();
+    
+    for cap in matches {
+        if cap.start() < buffer.cursors[c].index {
+            buffer.cursors[c].index = cap.start();
+            return;
         }
     }
+    //Finally, move to the front
+    move_front(buffer, c, _key);
 }
 fn move_find(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     let mut line_iter = buffer.lines[buffer.cursors[c].line].chars();
@@ -170,18 +182,56 @@ fn move_find(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     }
 }
 fn move_find_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
-    let mut line_iter = buffer.lines[buffer.cursors[c].line].chars();
+    let mut line_iter = buffer.lines[buffer.cursors[c].line].chars().rev();
     let key_as_char: char = _key.unwrap().chars().next().unwrap();
-    let mut i = buffer.cursors[c].index + 1;
+    let mut i = buffer.cursors[c].index;
     
-    line_iter.nth(buffer.cursors[c].index);
+    line_iter.nth((buffer.lines[buffer.cursors[c].line].len() - 1) - buffer.cursors[c].index);
     while let Some(next_char) = line_iter.next() {
         if next_char == key_as_char {
-            buffer.cursors[c].index = i;
+            buffer.cursors[c].index = i - 1;
             return;
         }
-        i += 1;
+        i -= 1;
     }
+}
+fn move_till(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+    move_find(buffer, c, _key);
+    match buffer.lines[buffer.cursors[c].line].chars().nth(buffer.cursors[c].index) {
+        Some(x) => {
+            if x.to_string() == _key.unwrap() {
+                move_left(buffer, c, _key);
+            }
+        },
+        None => ()
+    }
+}
+fn move_till_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+    move_find_reverse(buffer, c, _key);
+    match buffer.lines[buffer.cursors[c].line].chars().nth(buffer.cursors[c].index) {
+        Some(x) => {
+            if x.to_string() == _key.unwrap() {
+                move_right(buffer, c, _key);
+            }
+        },
+        None => ()
+    }
+}
+
+fn move_beginning(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+    if c != 0 { return; }
+    
+    buffer.cursors[c].line = 0;
+    buffer.cursors[c].index = 0;
+}
+fn move_end(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+    if c != 0 { return; }
+    
+    buffer.cursors[c].line = buffer.lines.len().checked_sub(1).unwrap_or(0);
+    buffer.cursors[c].index =
+        buffer.lines.get(buffer.cursors[c].line)
+        .unwrap_or(&("".to_owned())).len()
+        .checked_sub(1).unwrap_or(0);
 }
 
 //Viewport mutation
