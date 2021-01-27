@@ -56,6 +56,7 @@ fn main() {
         .size(800, 500)
         .resizable(true)
         .visible(false)
+        .debug(true)
         .user_data(main_buffer)
         .invoke_handler(|_webview, _arg| {
             handler(_webview, _arg);
