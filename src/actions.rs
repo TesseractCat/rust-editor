@@ -7,60 +7,63 @@ use regex::*;
 
 type EditAction = fn(&mut Buffer, usize, Option<&str>) -> ();
 
-lazy_static! {
-    static ref ACTIONMAP: HashMap<&'static str, EditAction> = {
+/*lazy_static! {
+    pub static ref ACTIONMAP: HashMap<&'static str, EditAction> = {
         let mut m = HashMap::<&'static str, EditAction>::new();
-        m.insert("moveUp", move_up);
-        m.insert("moveDown", move_down);
-        m.insert("moveLeft", move_left);
-        m.insert("moveRight", move_right);
+        m.insert("move_up", move_up);
+        m.insert("move_down", move_down);
+        m.insert("move_left", move_left);
+        m.insert("move_right", move_right);
         
-        m.insert("viewportUp", viewport_up);
-        m.insert("viewportDown", viewport_down);
+        m.insert("viewport_up", viewport_up);
+        m.insert("viewport_down", viewport_down);
         
-        m.insert("moveBeginning", move_beginning);
-        m.insert("moveEnd", move_end);
+        m.insert("move_beginning", move_beginning);
+        m.insert("move_end", move_end);
         
-        m.insert("moveFront", move_front);
-        m.insert("moveBack", move_back);
-        m.insert("moveWord", move_word);
-        m.insert("moveWordReverse", move_word_reverse);
+        m.insert("move_front", move_front);
+        m.insert("move_back", move_back);
+        m.insert("move_word", move_word);
+        m.insert("move_word_reverse", move_word_reverse);
         
-        m.insert("moveFind", move_find);
-        m.insert("moveFindReverse", move_find_reverse);
-        m.insert("moveTill", move_till);
-        m.insert("moveTillReverse", move_till_reverse);
+        m.insert("move_find", move_find);
+        m.insert("move_find_reverse", move_find_reverse);
+        m.insert("move_till", move_till);
+        m.insert("move_till_reverse", move_till_reverse);
         
-        m.insert("newCursorUp", new_cursor_up);
-        m.insert("newCursorDown", new_cursor_down);
+        m.insert("new_cursor_up", new_cursor_up);
+        m.insert("new_cursor_down", new_cursor_down);
         
-        m.insert("deleteChar", delete_char);
-        m.insert("deleteBack", delete_back);
-        m.insert("replaceChar", replace);
-        m.insert("toggleCharCase", toggle_char_case);
-        m.insert("insertChar", insert_char);
-        m.insert("deleteLine", delete_line);
+        m.insert("delete_char", delete_char);
+        m.insert("delete_back", delete_back);
+        m.insert("replace_char", replace);
+        m.insert("toggle_char_case", toggle_char_case);
+        m.insert("insert_char", insert_char);
+        m.insert("delete_line", delete_line);
         m.insert("delete", delete);
         
-        m.insert("splitLine", split_line);
-        m.insert("joinLine", join_line);
+        m.insert("split_line", split_line);
+        m.insert("join_line", join_line);
         
-        m.insert("openUp", open_up);
-        m.insert("openDown", open_down);
+        m.insert("open_up", open_up);
+        m.insert("open_down", open_down);
         
-        m.insert("toggleSelection", toggle_selection);
-        m.insert("swapSelection", swap_selection);
+        m.insert("toggle_selection", toggle_selection);
+        m.insert("swap_selection", swap_selection);
         
-        m.insert("openFile", open_file);
+        m.insert("open_file", open_file);
         m
     };
 }
 
-pub fn execute_action(buffer: &mut Buffer, command: &str, motion: &Value, key: Option<&str>) {
+pub fn execute_action(buffer: &mut Buffer, command: &str, motion: &Value, key: Option<&str>) -> Vec<(usize, String)> {
+    let mut line_changes: Vec<(usize, String)> = vec![];
+    
     if motion != &Value::Null {
         execute_action(buffer, "toggleSelection", &Value::Null, None);
         execute_action(buffer, motion["action"].as_str().unwrap(), &Value::Null, motion["key"].as_str());
-        execute_action(buffer, command, &Value::Null, None);
+        //This action is the only one to modify the file
+        line_changes = execute_action(buffer, command, &Value::Null, None);
         execute_action(buffer, "toggleSelection", &Value::Null, None);
     } else {
         buffer.cursors.sort_by(|c, d| {
@@ -70,12 +73,19 @@ pub fn execute_action(buffer: &mut Buffer, command: &str, motion: &Value, key: O
         for c in 0..buffer.cursors.len() {
             let mut lines_diff: isize = buffer.lines.len() as isize;
             let mut columns_diff: isize = buffer.lines[buffer.cursors[c].line].len() as isize;
+            let line_prev: String = buffer.lines[buffer.cursors[c].line].to_owned();
+            
             match ACTIONMAP.get(command) {
                 Some(x) => x(buffer, c, key),
                 None => ()
             }
             lines_diff = (buffer.lines.len() as isize) - lines_diff;
             columns_diff = (buffer.lines[buffer.cursors[c].line].len() as isize) - columns_diff;
+            
+            //Push line change
+            if line_prev != buffer.lines[buffer.cursors[c].line] {
+                line_changes.push((buffer.cursors[c].line, buffer.lines[buffer.cursors[c].line].to_owned()));
+            }
             
             //Shift previous cursors
             for d in 0..c {
@@ -88,9 +98,16 @@ pub fn execute_action(buffer: &mut Buffer, command: &str, motion: &Value, key: O
             }
         }
     }
+    return line_changes;
+}*/
+
+pub fn execute_action(action: EditAction, buffer: &mut Buffer, key: Option<&str>) {
+    for c in 0..buffer.cursors.len() {
+        action(buffer, c, key);
+    }
 }
 
-fn constrain_cursor(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn constrain_cursor(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.lines[buffer.cursors[c].line].chars().count() == 0 {
         buffer.cursors[c].index = 0;
     } else if buffer.cursors[c].index > buffer.lines[buffer.cursors[c].line].chars().count() {
@@ -99,43 +116,37 @@ fn constrain_cursor(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
 }
 
 //Movement
-fn move_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.cursors[c].line > 0 {
         buffer.cursors[c].line -= 1;
     }
-    if buffer.cursors[c].line < buffer.viewport {
-        buffer.viewport = buffer.cursors[c].line;
-    }
 }
-fn move_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.cursors[c].line < buffer.lines.len() - 1 {
         buffer.cursors[c].line += 1;
     }
-    if buffer.cursors[c].line - buffer.viewport > buffer.height {
-        buffer.viewport = buffer.cursors[c].line;
-    }
 }
-fn move_left(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_left(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     constrain_cursor(buffer, c, None);
     
     if buffer.cursors[c].index > 0 {
         buffer.cursors[c].index -= 1;
     }
 }
-fn move_right(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_right(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.cursors[c].index += 1;
     constrain_cursor(buffer, c, None);
 }
 
-fn move_front(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_front(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.cursors[c].index = 0;
 }
-fn move_back(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_back(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.lines[buffer.cursors[c].line].len() != 0 {
         buffer.cursors[c].index = buffer.lines[buffer.cursors[c].line].chars().count()-1;
     }
 }
-fn move_word(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_word(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     lazy_static! {
         //static ref WORDRE: Regex = Regex::new("(([A-z]|[0-9]|_)+|[^a-zA-Z0-9\\s]+)").unwrap();
         static ref WORDRE: Regex = Regex::new("([A-z]|[0-9]|_)+").unwrap();
@@ -149,7 +160,7 @@ fn move_word(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     //Finally, move to the back
     move_back(buffer, c, _key);
 }
-fn move_word_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_word_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     lazy_static! {
         //static ref WORDRE: Regex = Regex::new("(([A-z]|[0-9]|_)+|[^a-zA-Z0-9\\s]+)").unwrap();
         static ref WORDRE: Regex = Regex::new("([A-z]|[0-9]|_)+").unwrap();
@@ -167,7 +178,7 @@ fn move_word_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     //Finally, move to the front
     move_front(buffer, c, _key);
 }
-fn move_find(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_find(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     let mut line_iter = buffer.lines[buffer.cursors[c].line].chars();
     let key_as_char: char = _key.unwrap().chars().next().unwrap();
     let mut i = buffer.cursors[c].index + 1;
@@ -181,7 +192,7 @@ fn move_find(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
         i += 1;
     }
 }
-fn move_find_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_find_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     let mut line_iter = buffer.lines[buffer.cursors[c].line].chars().rev();
     let key_as_char: char = _key.unwrap().chars().next().unwrap();
     let mut i = buffer.cursors[c].index;
@@ -195,7 +206,7 @@ fn move_find_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
         i -= 1;
     }
 }
-fn move_till(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_till(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     move_find(buffer, c, _key);
     match buffer.lines[buffer.cursors[c].line].chars().nth(buffer.cursors[c].index) {
         Some(x) => {
@@ -206,7 +217,7 @@ fn move_till(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
         None => ()
     }
 }
-fn move_till_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_till_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     move_find_reverse(buffer, c, _key);
     match buffer.lines[buffer.cursors[c].line].chars().nth(buffer.cursors[c].index) {
         Some(x) => {
@@ -218,13 +229,13 @@ fn move_till_reverse(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     }
 }
 
-fn move_beginning(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_beginning(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if c != 0 { return; }
     
     buffer.cursors[c].line = 0;
     buffer.cursors[c].index = 0;
 }
-fn move_end(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn move_end(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if c != 0 { return; }
     
     buffer.cursors[c].line = buffer.lines.len().checked_sub(1).unwrap_or(0);
@@ -234,32 +245,16 @@ fn move_end(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
         .checked_sub(1).unwrap_or(0);
 }
 
-//Viewport mutation
-fn viewport_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+//Viewport mutation TODO
+pub fn viewport_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if c != 0 { return; }
-    
-    match buffer.viewport.checked_sub(1) {
-        Some(n) => buffer.viewport = n,
-        None => (),
-    }
 }
-fn viewport_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn viewport_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if c != 0 { return; }
-    
-    buffer.viewport += 1;
-    
-    //Constrain to file length
-    if buffer.viewport >= buffer.lines.len() {
-        buffer.viewport = buffer.lines.len() - 1;
-    }
-    
-    if buffer.cursors.len() == 1 && buffer.cursors[0].line < buffer.viewport {
-        buffer.cursors[0].line = buffer.viewport;
-    }
 }
 
 //Cursor mutation
-fn new_cursor_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn new_cursor_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.cursors.sort_by(|c, d| {
         d.line.cmp(&c.line).then_with(|| d.index.cmp(&c.index))
     });
@@ -275,7 +270,7 @@ fn new_cursor_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
         range:false,
     }));
 }
-fn new_cursor_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn new_cursor_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.cursors.sort_by(|c, d| {
         d.line.cmp(&c.line).then_with(|| d.index.cmp(&c.index))
     });
@@ -293,12 +288,12 @@ fn new_cursor_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
 }
 
 //Selection
-fn toggle_selection(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn toggle_selection(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.cursors[c].range = !buffer.cursors[c].range;
     buffer.cursors[c].line_range = buffer.cursors[c].line;
     buffer.cursors[c].index_range = buffer.cursors[c].index;
 }
-fn swap_selection(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn swap_selection(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     let temp_line = buffer.cursors[c].line;
     buffer.cursors[c].line = buffer.cursors[c].line_range;
     buffer.cursors[c].line_range = temp_line;
@@ -309,7 +304,7 @@ fn swap_selection(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
 }
 
 //Text mutation
-fn delete(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn delete(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.cursors[c].range {
         buffer.sub_cursor(&buffer.cursors[c].clone(), "");
         if !buffer.cursors[c].is_lower() {
@@ -317,7 +312,7 @@ fn delete(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
         }
     }
 }
-fn delete_char(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn delete_char(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     constrain_cursor(buffer, c, None);
     if buffer.lines[buffer.cursors[c].line].chars().count() > 0
         && buffer.cursors[c].index < buffer.lines[buffer.cursors[c].line].chars().count() {
@@ -328,7 +323,7 @@ fn delete_char(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     }
     buffer.dirty = true;
 }
-fn delete_back(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn delete_back(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.cursors[c].index > 0 {
         move_left(buffer, c, _key);
         delete_char(buffer, c, _key);
@@ -338,7 +333,7 @@ fn delete_back(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     }
     buffer.dirty = true;
 }
-fn replace(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn replace(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     let mut to_sub_text = buffer.get_in_cursor(&buffer.cursors[c].clone());
     
     let key = _key.unwrap().chars().next().unwrap();
@@ -351,7 +346,7 @@ fn replace(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
         swap_selection(buffer, c, _key);
     }
 }
-fn toggle_char_case(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn toggle_char_case(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     let mut to_sub_text = buffer.get_in_cursor(&buffer.cursors[c].clone());
     
     to_sub_text = to_sub_text.chars().map(|c| {
@@ -367,12 +362,12 @@ fn toggle_char_case(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
         swap_selection(buffer, c, _key);
     }
 }
-fn insert_char(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn insert_char(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.add_before_cursor(&buffer.cursors[c].clone(), _key.unwrap());
 }
 
 //Line mutation
-fn delete_line(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn delete_line(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.lines.remove(buffer.cursors[c].line);
     if buffer.cursors[c].line >= buffer.lines.len() {
         move_up(buffer, c, _key);
@@ -382,7 +377,7 @@ fn delete_line(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     }
     buffer.dirty = true;
 }
-fn split_line(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn split_line(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.lines[buffer.cursors[c].line].len() > 0 {
         let front_split = buffer.lines[buffer.cursors[c].line][..buffer.cursors[c].index].to_string();
         let back_split = buffer.lines[buffer.cursors[c].line][buffer.cursors[c].index..].to_string();
@@ -393,7 +388,7 @@ fn split_line(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     }
     buffer.dirty = true;
 }
-fn join_line(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn join_line(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     if buffer.cursors[c].line < buffer.lines.len() - 1 {
         let next_line = buffer.lines[buffer.cursors[c].line+1].clone();
         let line_len = buffer.lines[buffer.cursors[c].line].len();
@@ -404,15 +399,15 @@ fn join_line(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     constrain_cursor(buffer, c, None);
     buffer.dirty = true;
 }
-fn open_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn open_up(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.lines.insert(buffer.cursors[c].line, "".to_string());
     buffer.dirty = true;
 }
-fn open_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
+pub fn open_down(buffer: &mut Buffer, c: usize, _key: Option<&str>) {
     buffer.lines.insert(buffer.cursors[c].line + 1, "".to_string());
     buffer.dirty = true;
 }
 
-fn open_file(_buffer: &mut Buffer, _c: usize, _key: Option<&str>) {
+pub fn open_file(_buffer: &mut Buffer, _c: usize, _key: Option<&str>) {
     println!("File path chosen: {}", tinyfiledialogs::open_file_dialog("Open", "./", None).unwrap());
 }

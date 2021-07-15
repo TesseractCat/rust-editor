@@ -7,14 +7,12 @@ pub struct Buffer {
     pub path: Option<String>,
     pub changed: bool, //TODO: Handle this value
     
-    pub viewport: usize,
-    pub height: usize,
-    
     pub lines: Vec<String>,
     pub file_as_string: String,
     pub dirty: bool,
     
     pub cursors: Vec<Box<Cursor>>,
+    pub focused_cursor: usize,
 }
 
 impl Buffer {
@@ -22,8 +20,6 @@ impl Buffer {
         Buffer {
             path: None,
             changed: false,
-            viewport:0,
-            height:50,
             lines: vec!["Scratch buffer".to_string(), "".to_string(), "Text".to_string()],
             file_as_string: vec!["Scratch buffer".to_string(), "".to_string(), "Text".to_string()].join("\n"),
             dirty: false,
@@ -34,6 +30,7 @@ impl Buffer {
                 index_range:0,
                 range:false,
             })],
+            focused_cursor: 0
         }
     }
     

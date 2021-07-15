@@ -4,160 +4,9 @@ window.addEventListener('load', function() {
     document.focus();
 });
 window.addEventListener('focus', function () {
-    externalDebug("testing");
     document.focus();
 });
 document.addEventListener('keydown', keyDown);
-
-var modeArr = ["normal"];
-var actionString = [""];
-
-var actions = {
-    "normal": {
-        "h":{action:"moveLeft"},
-        "j":{action:"moveDown"},
-        "k":{action:"moveUp"},
-        "l":{action:"moveRight"},
-        "<Enter>":{action:"moveDown"},
-        "<Backspace>":{action:"moveLeft"},
-        
-        "<C-k>":{action:"newCursorUp"},
-        "<C-j>":{action:"newCursorDown"},
-        
-        "gg":{action:"moveBeginning"},
-        "G":{action:"moveEnd"},
-        
-        "w":{action:"moveWord"},
-        "b":{action:"moveWordReverse"},
-        
-        "$":{action:"moveBack"},
-        "0":{action:"moveFront"},
-        
-        "f":{action:"moveFind",params:["key"]},
-        "F":{action:"moveFindReverse",params:["key"]},
-        "t":{action:"moveTill",params:["key"]},
-        "T":{action:"moveTillReverse",params:["key"]},
-        
-        "c":{action:["delete","modeInsert"],params:["motion"]},
-        "C":"c$",
-        "cc":"0c$",
-        "r":{action:"replaceChar",params:["key"]},
-        "~":{action:["toggleCharCase","moveRight"]},
-        "x":{action:"deleteChar"},
-        "d":{action:"delete",params:["motion"]},
-        "dd":{action:"deleteLine",params:[""]},
-        
-        "gt":{action:"nextTab"},
-        "gT":{action:"prevTab"},
-        "o":{action:["openDown","moveDown","modeInsert"]},
-        "O":{action:["openUp","modeInsert"]},
-        
-        "J":{action:"joinLine"},
-        
-        "I":{action:["moveFront","modeInsert"],params:["local"]},
-        "i":{action:"modeInsert",params:["local"]},
-        "s":{action:["deleteChar","modeInsert"],params:["local"]},
-        "a":{action:["modeInsert","moveRight"],params:["local"]},
-        "A":{action:["moveBack","modeInsert","moveRight"],params:["local"]},
-        "v":{action:["toggleSelection","modeSelection"]},
-        ":":{action:"modeConsole",params:["local"]},
-        
-        "<C-u>":{action:"viewportUp"},
-        "<C-d>":{action:"viewportDown"},
-        
-        "<A-F4>":"<Escape>:q<Enter>",
-        "<C-s>":":w<Enter>",
-        "<C-o>":{action:"openFile"},
-        
-        "<Escape>":{action:"clearActions"},
-    },
-    "selection": {
-        "h":{action:"moveLeft"},
-        "j":{action:"moveDown"},
-        "k":{action:"moveUp"},
-        "l":{action:"moveRight"},
-        "o":{action:"swapSelection"},
-        
-        "gg":{action:"moveBeginning"},
-        "G":{action:"moveEnd"},
-        "w":{action:"moveWord"},
-        "b":{action:"moveWordReverse"},
-        "$":{action:"moveBack"},
-        "0":{action:"moveFront"},
-        
-        "~":{action:["toggleCharCase","exitModeSelection"]},
-        "r":{action:["replaceChar","exitModeSelection"],params:["key"]},
-        "d":{action:["delete","exitModeSelection"]},
-        "x":{action:["delete","exitModeSelection"]},
-        "c":"di",
-        
-        "f":{action:"moveFind",params:["key"]},
-        "F":{action:"moveFindReverse",params:["key"]},
-        "t":{action:["moveFind","moveLeft"],params:["key"]},
-        "T":{action:["moveFindReverse","moveRight"],params:["key"]},
-        
-        "i":{action:"moveInside",params:["key"]},
-        "a":{action:"moveAround",params:["key"]},
-        
-        "<Escape>":{action:["exitModeSelection"]},
-        "v":{action:["exitModeSelection"]},
-        
-        "<C-u>":{action:"viewportUp"},
-        "<C-d>":{action:"viewportDown"},
-        
-        "<A-F4>":"<Escape>:q<Enter>",
-    },
-    "motion": {
-        "h":{action:"moveLeft"},
-        "j":{action:"moveDown"},
-        "k":{action:"moveUp"},
-        "l":{action:"moveRight"},
-        
-        "w":{action:"moveWord"},
-        "b":{action:"moveWordReverse"},
-        "f":{action:"moveFind",params:["key"]},
-        "i":{action:"moveInside",params:["key"]},
-        "a":{action:"moveAround",params:["key"]},
-        
-        "gg":{action:"moveBeginning"},
-        "G":{action:"moveEnd"},
-        
-        "w":{action:"moveWord"},
-        "f":{action:"moveFind",params:["key"]},
-        "F":{action:"moveFindReverse",params:["key"]},
-        "t":{action:"moveTill",params:["key"]},
-        "T":{action:"moveTillReverse",params:["key"]},
-        
-        "$":{action:"moveBack"},
-        "0":{action:"moveFront"},
-        "<Escape>":{action:"clearActions"},
-    },
-    "key": {
-        "<*>":{action:"anyChar",params:["key"]},
-        "<Escape>":{action:"modeNormal"},
-    },
-    "insert": {
-        "<*>":{action:["insertChar","moveRight"],params:["key"]},
-        "<Backspace>":{action:"deleteBack"},
-        "<ArrowLeft>":{action:"moveLeft"},
-        "<ArrowDown>":{action:"moveDown"},
-        "<ArrowUp>":{action:"moveUp"},
-        "<ArrowRight>":{action:"moveRight"},
-        "<Escape>":{action:["modeNormal","moveLeft"]},
-        "<Enter>":{action:["splitLine","moveDown","moveFront"]},
-    },
-    "console": {
-        "<*>":{action:"insertConsoleChar",params:["key"]},
-        "<A-F4>":"<Escape>:q<Enter>",
-        "<Enter>":{action:"runConsole"},
-        "<Backspace>":{action:"deleteBackConsole"},
-        "<Escape>":{action:"modeNormal"},
-    }
-};
-
-var ignoredKeys = [
-   "Shift", "Alt", "Control", "<A-Alt>", "<C-Control>"
-];
 
 var replacedKeys = {
     "Spacebar": " ",
@@ -171,6 +20,7 @@ var replacedKeys = {
 };
 
 function modeNormal(data) {
+    //togglePalette(false);
     changeMode("normal");
     document.getElementById("console-text").innerText = '';
 }
@@ -185,6 +35,7 @@ function exitModeSelection(data) {
     modeNormal(data);
 }
 function modeConsole(data) {
+    //togglePalette(true);
     document.getElementById("console-text").innerText = ':';
     changeMode("console");
 }
@@ -218,10 +69,6 @@ function runConsole(data) {
     };
     
     external.invoke(JSON.stringify(consoleJson));
-    
-    document.getElementById("console-text").innerText = '';
-
-    changeMode("normal");
 }
 
 function numStrOverlaps(strArr, testStr) {
@@ -236,19 +83,6 @@ function numStrOverlaps(strArr, testStr) {
     return out;
 }
 
-function clearActions() {
-    if (actionString[0] == "" && actionString.length == 1) {
-        var consoleJson = {
-            "type":"console",
-            "command":":cc",
-        };
-    
-        external.invoke(JSON.stringify(consoleJson));
-    }
-    modeArr = [modeArr[0]];
-    actionString = [""];
-}
-
 function externalDebug(msg) {
     external.invoke(JSON.stringify(
         {
@@ -258,27 +92,12 @@ function externalDebug(msg) {
     ));
 }
 
-function executeAction(action, key, motion) {
-    if (window[action] != undefined) {
-        window[action](executeActionJSON(action, key, motion));
-    } else {
-        if (typeof action == "string") {
-            external.invoke(JSON.stringify(executeActionJSON(action, key, motion)));
-        } else {
-            for (var i = 0; i < action.length; i++) {
-                executeAction(action[i], key, motion);
-            }
-        }
-    }
-}
-
-function executeActionJSON(action, key, motion) {
-    return {
-        "type":"edit",
-        "action":action,
+function executeKeyEvent(event, key) {
+    external.invoke(JSON.stringify({
+        "type":"keyevent",
+        "event":event,
         "key":key,
-        "motion":motion
-    };
+    }));
 }
 
 function changeMode(newMode) {
@@ -363,7 +182,6 @@ function populateBuffer(buffer) {
     currentBuffer = JSON.parse(JSON.stringify(buffer));
     
     //Update file name
-    externalDebug(buffer.path);
     document.getElementsByClassName("tab")[0].innerText =
         (buffer.path == "" ? "<Untitled>" : buffer.path);
     
@@ -388,16 +206,12 @@ function populateBuffer(buffer) {
     
     //Add cursor html
     buffer.cursors.forEach(cursor => {
-        //Shift cursors to align with viewport
-        cursor.line = cursor.line - buffer.viewport
-        cursor.line_range = cursor.line_range - buffer.viewport
-        
         linesWithCursor.push(cursor.line);
         linesWithCursor.push(cursor.line_range);
         
         if (cursor.line < lineNodes.length && cursor.line >= 0) {
             highlightRanges[cursor.line].push(
-                {class: (modeArr[0] == "insert" ? "cursor-vbar" : "cursor"), start: cursor.index, end: cursor.index});
+                {class: (false ? "cursor-vbar" : "cursor"), start: cursor.index, end: cursor.index});
         }
         if (!cursor.range)
             return;
@@ -517,111 +331,30 @@ function populateBuffer(buffer) {
     });
 }
 
-function anyChar(e) {
-    if (actionString.length == 1) {
-        executeAction(
-            actions[modeArr[modeArr.length - 2]][actionString[actionString.length - 1]].action,
-            keyString);
-    } else {
-        executeAction(actions[modeArr[0]][actionString[0]].action, undefined,
-            executeActionJSON(
-                actions[modeArr[modeArr.length - 2]][actionString[actionString.length - 1]].action,
-                keyString));
+function populateLine(idx, new_line) {
+    //TODO
+}
+
+function togglePalette(visible) {
+    palette.style.visibility = visible ? "visible" : "hidden";
+    palette.style.opacity = visible ? 1 : 0;
+    if (visible) {
+        window.setTimeout(function() {
+            document.getElementById("palette-input").focus();
+        }, 10);
     }
-    clearActions();
 }
 
 function keyDown(e) {
+    if (document.activeElement === document.getElementById("palette-input")) {
+        return;
+    }
+    
     keyString = e.key;
     if (e.altKey) {
         keyString = "<A-" + keyString + ">";
     } else if (e.ctrlKey) {
         keyString = "<C-" + keyString + ">";
     }
-    var toPress = null;
-    
-    if (ignoredKeys.indexOf(keyString) != -1)
-        return;
-    if (replacedKeys[keyString] != undefined) {
-        keyString = replacedKeys[keyString];
-    }
-    
-    mode = modeArr[modeArr.length - 1];
-    modeActions = Object.keys(actions[mode]);
-    
-    //Wildcard mode
-    if (modeActions[0] == "<*>") {
-        if (modeActions.indexOf(keyString) != -1) {
-            //TODO: Move this to function
-            if (typeof actions[mode][keyString] == "string") {
-                clearActions();
-                actions[mode][keyString].match(/\<.+?\>|./g).forEach((e) => {
-                    keyDown({key:e});
-                });
-            } else {
-                executeAction(
-                    actions[mode][keyString].action,
-                    keyString);
-            }
-        } else {
-            executeAction(
-                actions[mode][modeActions[0]].action,
-                keyString);
-        }
-        return;
-    }
-    
-    //No possible actions with this key sequence
-    if (numStrOverlaps(modeActions, actionString[actionString.length - 1] + keyString) == 0) {
-        //Check and see if actionString - 1 char matches 1 modeActions.filter by len.
-        var modeActionsFiltered = modeActions.filter(function (x) {
-            return x.length <= actionString[actionString.length - 1].length;
-        });
-        
-        if (numStrOverlaps(modeActionsFiltered,
-            actionString[actionString.length - 1]) != 1) {
-            //Still no possible action
-            clearActions();
-            return;
-        } else {
-            modeActions = modeActionsFiltered;
-            toPress = keyString;
-        }
-    } else {
-        //Append to the action string
-        actionString[actionString.length - 1] += keyString;
-    }
-    
-    //We've reached the action
-    if (numStrOverlaps(modeActions, actionString[actionString.length - 1]) == 1) {
-        var actionObj = actions[mode][actionString[actionString.length - 1]];
-        
-        if (actionObj.params == undefined)
-            actionObj.params = [];
-        
-        if (typeof actionObj == "string") {
-            clearActions();
-            actionObj.match(/\<.+?\>|./g).forEach((e) => {
-                keyDown({key:e});
-            });
-        } else if (actionObj.params.indexOf("key") != -1) {
-            modeArr.push("key");
-        } else if (actionObj.params.indexOf("motion") != -1) {
-            modeArr.push("motion");
-            actionString.push("");
-        } else {
-            //No pending mode, action sequence over
-            if (actionString.length == 1) {
-                executeAction(actions[modeArr[0]][actionString[0]].action);
-            } else {
-                executeAction(actions[modeArr[0]][actionString[0]].action, undefined,
-                    executeActionJSON(actions[mode][actionString[actionString.length - 1]].action));
-            }
-            clearActions();
-        }
-    }
-    
-    if (toPress != null) {
-        keyDown({key:toPress});
-    }
+    executeKeyEvent("keydown", keyString);
 }
